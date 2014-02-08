@@ -50,52 +50,50 @@
 #import <AssetsLibrary/AssetsLibrary.h>
 #import "AVCamPreviewView.h"
 
-static void * CapturingStillImageContext = &CapturingStillImageContext;
-static void * RecordingContext = &RecordingContext;
-static void * SessionRunningAndDeviceAuthorizedContext = &SessionRunningAndDeviceAuthorizedContext;
-
-@interface AVCamViewController () <AVCaptureFileOutputRecordingDelegate>
-
-# For use in the storyboards.
-@property (nonatomic, weak) IBOutlet AVCamPreviewView *previewView;
-@property (nonatomic, weak) IBOutlet UIButton *recordButton;
-@property (nonatomic, weak) IBOutlet UIButton *cameraButton;
-@property (nonatomic, weak) IBOutlet UIButton *stillButton;
-
-- (IBAction)toggleMovieRecording:(id)sender;
-- (IBAction)changeCamera:(id)sender;
-- (IBAction)snapStillImage:(id)sender;
-- (IBAction)focusAndExposeTap:(UIGestureRecognizer *)gestureRecognizer;
-
-# Session management.
-# Communicate with the session and other session objects on this queue
-
-# @property (nonatomic) dispatch_queue_t sessionQueue;
-# @property (nonatomic) AVCaptureSession *session;
-# @property (nonatomic) AVCaptureDeviceInput *videoDeviceInput;
-# @property (nonatomic) AVCaptureMovieFileOutput *movieFileOutput;
-# @property (nonatomic) AVCaptureStillImageOutput *stillImageOutput;
-
-# Utilities.
-# @property (nonatomic) UIBackgroundTaskIdentifier backgroundRecordingID;
-# @property (nonatomic, getter = isDeviceAuthorized) BOOL deviceAuthorized;
-# @property (nonatomic, readonly, getter = isSessionRunningAndDeviceAuthorized) BOOL sessionRunningAndDeviceAuthorized;
-# @property (nonatomic) BOOL lockInterfaceRotation;
-# @property (nonatomic) id runtimeErrorHandlingObserver;
-
-# @end
-
 class AVCamViewController < UIViewController
 
   attr_accessor :sessionQueue, :session, :videoDeviceInput, :movieFileOutput, :stillImageOutput
   # Utilities
   attr_accessor :backgroundRecordingID, :deviceAuthorized, :sessionRunningAndDeviceAuthorized, :lockInterfaceRotation, :runtimeErrorHandlingObserver
 
-  def isSessionRunningAndDeviceAuthorized
-    self.session.isRunning && self.isDeviceAuthorized
+  # Views and Buttons
+  attr_accessor :previewView, :recordButton, :cameraButton, :stillButton
+
+  # ContextPointer = Pointer.new(:object, 3)
+  # ContextPointer[0]="Capturing"
+  # ContextPointer[1]="Recording"
+  # ContextPointer[2]="SessionRunning"
+
+
+  CapturePointer = Pointer.new(:object, 1)
+  CapturePointer[0] = "Capturing"
+
+  RecordingPointer = Pointer.new(:object, 1)
+  RecordingPointer[0] = "Recording"
+
+  SessionRunningPointer = Pointer.new(:object, 1)
+  SessionRunningPointer[0] = "SessionRunning"
+
+
+  CapturingStillImageContext = CapturePointer
+  RecordingContext = RecordingPointer
+  SessionRunningAndDeviceAuthorizedContext = SessionRunningPointer
+
+  def sessionRunningAndDeviceAuthorized
+    NSLog("[method] sessionRunningAndDeviceAuthorized")
+    self.session.isRunning && self.deviceAuthorized
   end
 
+  def sessionRunningAndDeviceAuthorized=(sessionRunningAndDeviceAuthorized)
+    @sessionRunningAndDeviceAuthorized = sessionRunningAndDeviceAuthorized
+  end
+
+  # def deviceAuthorized
+
+  # end
+
   def self.keyPathsForValuesAffectingSessionRunningAndDeviceAuthorized
+    NSLog("[method] self.NSObject.keyPathsForValuesAffectingAuthorized")
     NSSet.setWithObjects("session.running", "deviceAuthorized", nil)
   end
 
@@ -107,6 +105,28 @@ class AVCamViewController < UIViewController
     self.setSession(session)
     
     # Setup the preview view
+    @previewView = AVCamPreviewView.alloc.initWithFrame(self.view.bounds)
+
+    @recordButton = UIButton.buttonWithType(UIButtonTypeCustom)
+    @recordButton.setTitle("Record", forState:UIControlStateNormal)
+    @recordButton.addTarget(self, action:"toggleMovieRecording:", forControlEvents:UIControlEventTouchUpInside)
+    @recordButton.frame = [[32,516], [72, 30]]
+
+    @cameraButton = UIButton.buttonWithType(UIButtonTypeCustom)
+    @cameraButton.setTitle("Swap", forState:UIControlStateNormal)
+    @cameraButton.addTarget(self, action:"changeCamera:", forControlEvents:UIControlEventTouchUpInside)
+    @cameraButton.frame = [[216,516], [72, 30]]
+
+    @stillButton = UIButton.buttonWithType(UIButtonTypeCustom)
+    @stillButton.setTitle("Still", forState:UIControlStateNormal)
+    @stillButton.addTarget(self, action:"snapStillImage:", forControlEvents:UIControlEventTouchUpInside)
+    @stillButton.frame = [[124,516], [72, 30]]
+
+    self.view.addSubview(@previewView)
+    self.view.addSubview(@recordButton)
+    self.view.addSubview(@cameraButton)
+    self.view.addSubview(@stillButton)
+
     self.previewView.setSession(session)
     
     # Check for device authorization
@@ -155,6 +175,7 @@ class AVCamViewController < UIViewController
           # video orientation changes on the AVCaptureVideoPreviewLayer’s connection with 
           # other session manipulation.
     
+          NSLog("Set Video Orientation")
           self.previewView.layer.connection.setVideoOrientation(self.interfaceOrientation)
         }
       end
@@ -185,8 +206,8 @@ class AVCamViewController < UIViewController
       stillImageOutput = AVCaptureStillImageOutput.alloc.init
       
       if session.canAddOutput(stillImageOutput)
-        settings = { AVVideoCodecKey: AVVideoCodecJPEG }
-        NSLog("Settings Object: %@", settings)
+        settings = { :AVVideoCodecKey => AVVideoCodecJPEG }
+        NSLog("Settings Object: %@", settings.to_s)
         stillImageOutput.setOutputSettings(settings)
         session.addOutput(stillImageOutput)
         self.setStillImageOutput(stillImageOutput)
@@ -198,13 +219,16 @@ class AVCamViewController < UIViewController
 
     # dispatch_async([self sessionQueue], ^{
     @sessionQueue.async {
+
+      NSLog("Setup a bunch of observers")
+
       self.addObserver(self, forKeyPath:"sessionRunningAndDeviceAuthorized", options:(NSKeyValueObservingOptionOld | NSKeyValueObservingOptionNew), context:SessionRunningAndDeviceAuthorizedContext)
 
       self.addObserver(self, forKeyPath:"stillImageOutput.capturingStillImage", options:(NSKeyValueObservingOptionOld | NSKeyValueObservingOptionNew), context:CapturingStillImageContext)
 
       self.addObserver(self, forKeyPath:"movieFileOutput.recording", options:(NSKeyValueObservingOptionOld | NSKeyValueObservingOptionNew), context:RecordingContext)
 
-      NSNotificationCenter.defaultCenter.addObserver(self, selector:@selector(subjectAreaDidChange:), name:AVCaptureDeviceSubjectAreaDidChangeNotification, object:self.videoDeviceInput.device)
+      NSNotificationCenter.defaultCenter.addObserver(self, selector:"subjectAreaDidChange:", name:AVCaptureDeviceSubjectAreaDidChangeNotification, object:self.videoDeviceInput.device)
       
       # __weak AVCamViewController *weakSelf = self;
       self.setRuntimeErrorHandlingObserver(NSNotificationCenter.defaultCenter.addObserverForName(AVCaptureSessionRuntimeErrorNotification, object:self.session, queue:nil, usingBlock: -> note {
@@ -213,7 +237,7 @@ class AVCamViewController < UIViewController
         @sessionQueue.async {
           # Manually restarting the session since it must have been stopped due to an error. 
           self.session.startRunning
-          self.recordButton.setTitle("Record",forState(UIControlStateNormal))
+          self.recordButton.setTitle("Record", forState:UIControlStateNormal)
         }
       }.weak!))
 
@@ -257,30 +281,48 @@ class AVCamViewController < UIViewController
 
   def observeValueForKeyPath(keyPath, ofObject:object, change:change, context:context)
 
-    if context == CapturingStillImageContext
-      isCapturingStillImage = change[NSKeyValueChangeNewKey].boolValue
+    NSLog("Observed Value For Key Path: %@", keyPath)
+    # NSLog("context = %@", context[0])
+    NSLog("change = %@", change.to_s)
+
+    # if context == CapturingStillImageContext
+    if keyPath == "stillImageOutput.capturingStillImage"
+      isCapturingStillImage = Utils.boolValue(change[NSKeyValueChangeNewKey])
+      NSLog("CapturingStillImageContext, change New: %@", isCapturingStillImage.to_s)
+
+      # isCapturingStillImage = change["new"].nil?
       
       if isCapturingStillImage
         self.runStillImageCaptureAnimation
       end
-    elsif context == RecordingContext
-      isRecording = change[NSKeyValueChangeNewKey].boolValue
+    # elsif context == RecordingContext
+    elsif keyPath == "movieFileOutput.recording"
+      isRecording = Utils.boolValue(change[NSKeyValueChangeNewKey])
+      NSLog("RecordingContext, change New: %@", isRecording.to_s)
+
+      # isRecording = change["new"].nil?
       
       # dispatch_async(dispatch_get_main_queue(), ->{
       Dispatch::Queue.main.async {
         if isRecording
           self.cameraButton.setEnabled(false)
-          self.recordButton.setTitle(NSLocalizedString("Stop", "Recording button stop title"), forState:UIControlStateNormal)
+          self.recordButton.setTitle("Stop", forState:UIControlStateNormal)
           self.recordButton.setEnabled(true)
         else
           self.cameraButton.setEnabled(true)
-          self.recordButton.setTitle(NSLocalizedString("Record", "Recording button record title"), forState:UIControlStateNormal)
+          self.recordButton.setTitle("Record", forState:UIControlStateNormal)
           self.recordButton.setEnabled(true)
         end
       } # main.async
-    elsif context == SessionRunningAndDeviceAuthorizedContext
-      isRunning = change[NSKeyValueChangeNewKey].boolValue
+    # elsif context == SessionRunningAndDeviceAuthorizedContext
+    elsif keyPath == "sessionRunningAndDeviceAuthorized"
+      isRunning = Utils.boolValue(change[NSKeyValueChangeNewKey])
+      NSLog("SessionRunningAndDeviceAuthorizedContext, change New: %@", isRunning.to_s)
+      # isRunning = change["new"].nil?
       
+
+      # isRunning = true
+
       # dispatch_async(dispatch_get_main_queue(), ->{
       Dispatch::Queue.main.async {
         if isRunning
@@ -294,7 +336,8 @@ class AVCamViewController < UIViewController
         end
       } # main.async
     else
-      super #.observeValueForKeyPath(keyPath, ofObject:object, change:change, context:context)
+      NSLog("Uh oh, not going to handle this properly")
+      # super #.observeValueForKeyPath(keyPath, ofObject:object, change:change, context:context)
     end
   end
 
@@ -400,12 +443,12 @@ class AVCamViewController < UIViewController
       # Capture a still image.
       NSLog("Is this Block Correct?")
 
-      self.stillImageOutput.captureStillImageAsynchronouslyFromConnection(self.stillImageOutput.connectionWithMediaType(AVMediaTypeVideo), completionHandler: -> |imageDataSampleBuffer, error| {
+      self.stillImageOutput.captureStillImageAsynchronouslyFromConnection(self.stillImageOutput.connectionWithMediaType(AVMediaTypeVideo), completionHandler: -> imageDataSampleBuffer, error {
         
         if imageDataSampleBuffer
           imageData = AVCaptureStillImageOutput.jpegStillImageNSDataRepresentation(imageDataSampleBuffer)
           image = UIImage.alloc.initWithData(imageData)
-          ALAssetsLibrary.alloc.init.writeImageToSavedPhotosAlbum(image.CGImage,orientation(image.imageOrientation, completionBlock:nil))
+          ALAssetsLibrary.alloc.init.writeImageToSavedPhotosAlbum(image.CGImage, orientation:image.imageOrientation, completionBlock:nil)
         end
       })
     } # end @sessionQueue.async
@@ -419,7 +462,7 @@ class AVCamViewController < UIViewController
   end
 
   def subjectAreaDidChange(notification)
-    devicePoint = CGPointMake(.5, .5)
+    devicePoint = CGPointMake(0.5, 0.5)
     self.focusWithMode(AVCaptureFocusModeContinuousAutoFocus, exposeWithMode:AVCaptureExposureModeContinuousAutoExposure, atDevicePoint:devicePoint, monitorSubjectAreaChange:false)
   end
 
@@ -439,15 +482,13 @@ class AVCamViewController < UIViewController
 
     self.setBackgroundRecordingID(UIBackgroundTaskInvalid)
     
-    ALAssetsLibrary.alloc.init.writeVideoAtPathToSavedPhotosAlbum(outputFileURL, completionBlock:-> |assetURL, error| {
+    ALAssetsLibrary.alloc.init.writeVideoAtPathToSavedPhotosAlbum(outputFileURL, completionBlock: -> assetURL, error {
 
       if error
-        NSLog("%@", error)
+        NSLog("Error 84 - %@", error)
       end
       
-      NSLog("Is this error correct?")
-      # NSFileManager.defaultManager.removeItemAtURL(outputFileURL, error.call(nil))
-      NSFileManager.defaultManager.removeItemAtURL(outputFileURL, error(nil))
+      NSFileManager.defaultManager.removeItemAtURL(outputFileURL, error:nil)
       
       if backgroundRecordingID != UIBackgroundTaskInvalid
         UIApplication.sharedApplication.endBackgroundTask(backgroundRecordingID)
@@ -525,7 +566,7 @@ class AVCamViewController < UIViewController
     # dispatch_async(dispatch_get_main_queue(), ^{
     Dispatch::Queue.main.async {
       self.previewView.layer.setOpacity(0.0)
-      UIView.animateWithDuration(.25, animations: -> {
+      UIView.animateWithDuration(0.25, animations: -> {
         self.previewView.layer.setOpacity(1.0)
       })
     }

@@ -53,7 +53,7 @@ class AVCamPreviewView < UIView
   attr_accessor :session
 
   def self.layerClass
-    "AVCaptureVideoPreviewLayer" #.class
+    AVCaptureVideoPreviewLayer #.class
   end
 
   def session
