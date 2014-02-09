@@ -99,33 +99,40 @@ class AVCamViewController < UIViewController
 
   def viewDidLoad
     super #.viewDidLoad
-    
+
     # Create the AVCaptureSession
     session = AVCaptureSession.alloc.init
     self.setSession(session)
     
     # Setup the preview view
-    @previewView = AVCamPreviewView.alloc.initWithFrame(self.view.bounds)
 
-    @recordButton = UIButton.buttonWithType(UIButtonTypeCustom)
-    @recordButton.setTitle("Record", forState:UIControlStateNormal)
-    @recordButton.addTarget(self, action:"toggleMovieRecording:", forControlEvents:UIControlEventTouchUpInside)
-    @recordButton.frame = [[32,516], [72, 30]]
+    # FROM HERE TO...
+    #########################################################################
+      self.navigationController.setNavigationBarHidden(true, animated:false)
 
-    @cameraButton = UIButton.buttonWithType(UIButtonTypeCustom)
-    @cameraButton.setTitle("Swap", forState:UIControlStateNormal)
-    @cameraButton.addTarget(self, action:"changeCamera:", forControlEvents:UIControlEventTouchUpInside)
-    @cameraButton.frame = [[216,516], [72, 30]]
+      @previewView = AVCamPreviewView.alloc.initWithFrame(self.view.bounds)
 
-    @stillButton = UIButton.buttonWithType(UIButtonTypeCustom)
-    @stillButton.setTitle("Still", forState:UIControlStateNormal)
-    @stillButton.addTarget(self, action:"snapStillImage:", forControlEvents:UIControlEventTouchUpInside)
-    @stillButton.frame = [[124,516], [72, 30]]
+      @recordButton = UIButton.buttonWithType(UIButtonTypeCustom)
+      @recordButton.setTitle("Record", forState:UIControlStateNormal)
+      @recordButton.addTarget(self, action:"toggleMovieRecording:", forControlEvents:UIControlEventTouchUpInside)
+      @recordButton.frame = [[32,516], [72, 30]]
 
-    self.view.addSubview(@previewView)
-    self.view.addSubview(@recordButton)
-    self.view.addSubview(@cameraButton)
-    self.view.addSubview(@stillButton)
+      @cameraButton = UIButton.buttonWithType(UIButtonTypeCustom)
+      @cameraButton.setTitle("Swap", forState:UIControlStateNormal)
+      @cameraButton.addTarget(self, action:"changeCamera:", forControlEvents:UIControlEventTouchUpInside)
+      @cameraButton.frame = [[216,516], [72, 30]]
+
+      @stillButton = UIButton.buttonWithType(UIButtonTypeCustom)
+      @stillButton.setTitle("Still", forState:UIControlStateNormal)
+      @stillButton.addTarget(self, action:"snapStillImage:", forControlEvents:UIControlEventTouchUpInside)
+      @stillButton.frame = [[124,516], [72, 30]]
+
+      self.view.addSubview(@previewView)
+      self.view.addSubview(@recordButton)
+      self.view.addSubview(@cameraButton)
+      self.view.addSubview(@stillButton)
+    #########################################################################
+    # HERE, IS ADDITIONAL SINCE WE AREN'T USING STORYBOARDS
 
     self.previewView.setSession(session)
     
@@ -281,16 +288,10 @@ class AVCamViewController < UIViewController
 
   def observeValueForKeyPath(keyPath, ofObject:object, change:change, context:context)
 
-    NSLog("Observed Value For Key Path: %@", keyPath)
-    # NSLog("context = %@", context[0])
-    NSLog("change = %@", change.to_s)
-
     # if context == CapturingStillImageContext
     if keyPath == "stillImageOutput.capturingStillImage"
       isCapturingStillImage = Utils.boolValue(change[NSKeyValueChangeNewKey])
       NSLog("CapturingStillImageContext, change New: %@", isCapturingStillImage.to_s)
-
-      # isCapturingStillImage = change["new"].nil?
       
       if isCapturingStillImage
         self.runStillImageCaptureAnimation
@@ -299,8 +300,6 @@ class AVCamViewController < UIViewController
     elsif keyPath == "movieFileOutput.recording"
       isRecording = Utils.boolValue(change[NSKeyValueChangeNewKey])
       NSLog("RecordingContext, change New: %@", isRecording.to_s)
-
-      # isRecording = change["new"].nil?
       
       # dispatch_async(dispatch_get_main_queue(), ->{
       Dispatch::Queue.main.async {
@@ -317,11 +316,7 @@ class AVCamViewController < UIViewController
     # elsif context == SessionRunningAndDeviceAuthorizedContext
     elsif keyPath == "sessionRunningAndDeviceAuthorized"
       isRunning = Utils.boolValue(change[NSKeyValueChangeNewKey])
-      NSLog("SessionRunningAndDeviceAuthorizedContext, change New: %@", isRunning.to_s)
-      # isRunning = change["new"].nil?
-      
-
-      # isRunning = true
+      NSLog("SessionRunningAndDeviceAuthorizedContext, change New: %@", isRunning.to_s)      
 
       # dispatch_async(dispatch_get_main_queue(), ->{
       Dispatch::Queue.main.async {
@@ -366,9 +361,6 @@ class AVCamViewController < UIViewController
         
         # Start recording to a temporary file.
         # NSString *outputFilePath = [NSTemporaryDirectory() stringByAppendingPathComponent:[@"movie" stringByAppendingPathExtension:@"mov"]];
-
-        NSLog("FilePath needs work")
-        # outputFilePath = NSTemporaryDirectory().stringByAppendingPathComponent("movie".stringByAppendingPathExtension("mov"))
         outputFilePath = "#{NSTemporaryDirectory()}movie.mov"
 
         self.movieFileOutput.startRecordingToOutputFileURL(NSURL.fileURLWithPath(outputFilePath), recordingDelegate:self)

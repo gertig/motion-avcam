@@ -13,20 +13,7 @@ Motion::Project::App.setup do |app|
   app.name = 'AVCam'
   app.frameworks += [
     'AssetsLibrary',
-    'AudioToolbox',
     'AVFoundation',
-    'CoreGraphics',
-    'CoreImage',
-    'CoreMedia',
-    'CoreVideo',
-    'Foundation',
-    'ImageIO',
-    'MediaPlayer',
-    'MessageUI',
-    'MobileCoreServices',
-    'OpenGLES',
-    'QuartzCore',
-    'SystemConfiguration',
-    'UIKit'
+    'SystemConfiguration'
     ]
 end
